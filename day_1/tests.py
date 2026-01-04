@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import time
 from typing import Any, Dict, List, Tuple
+import os
 
 FRESHNESS_SECONDS = 90
-FETCH_STAMP_PATH = "/content/.tests_last_fetched"
+BASE_DIR = os.path.join(os.getcwd(), ".gtl_day1")
+FETCH_STAMP_PATH = os.path.join(BASE_DIR, ".tests_last_fetched")
 
 def _is_fresh() -> Tuple[bool, str]:
     """
