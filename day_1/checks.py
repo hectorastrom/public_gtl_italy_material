@@ -470,9 +470,9 @@ def check_2_3_fn():
     assert_return_not_edit_me(sql_script, "2.3")
 
     rows = _fetchall("SELECT name, age, favorite_food FROM Students ORDER BY id;")
-    if len(rows) != 4:
+    if len(rows) != 5:
         raise AssertionError(
-            f"exercise 2.3 must result in 4 total rows, got {len(rows)}."
+            f"exercise 2.3 must result in 5 total rows, got {len(rows)}."
         )
 
     # For downstream determinism (2.4), we require these exact additional inserts.
