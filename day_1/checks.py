@@ -476,15 +476,45 @@ def check_2_3_fn():
         )
 
     # For downstream determinism (2.4), we require these exact additional inserts.
-    inserted = set(rows[1:4])  # skip the first row from 2.2, and last row of partner
-    expected = {
+    # The first row (index 0) is from exercise 2.2, rows 1-3 should be the three required students,
+    # and row 4 (index 4) should be the partner (which can be anything valid)
+    all_inserted = set(rows[1:])  # all rows inserted in 2.3 (skip first row from 2.2)
+    expected_three = {
         ("Mattia", 28, "pizza"),
         ("Joey", 19, "burgers"),
         ("Elena", 21, "risotto"),
     }
-    if inserted != expected:
+
+    # Check that the three required students are present
+    if not expected_three.issubset(all_inserted):
+        missing = expected_three - all_inserted
         raise AssertionError(
-            f"exercise 2.3 must insert exactly {expected} (in any order), got {inserted}."
+            f"exercise 2.3 must insert these three students: {expected_three}. "
+            f"Missing: {missing}. Got: {all_inserted}."
+        )
+
+    # Verify the partner row exists (should be exactly 4 rows from 2.3)
+    if len(all_inserted) != 4:
+        raise AssertionError(
+            f"exercise 2.3 must insert exactly 4 rows (3 required students + 1 partner), "
+            f"got {len(all_inserted)} rows: {all_inserted}."
+        )
+
+    # Verify partner row has valid data (non-empty name and food, integer age)
+    partner_row = all_inserted - expected_three
+    if len(partner_row) != 1:
+        raise AssertionError(
+            f"exercise 2.3 must have exactly one partner row. "
+            f"Found {len(partner_row)} additional rows: {partner_row}."
+        )
+    partner = list(partner_row)[0]
+    if not isinstance(partner[0], str) or not partner[0]:
+        raise AssertionError("exercise 2.3 partner name must be a non-empty string.")
+    if not isinstance(partner[1], int):
+        raise AssertionError("exercise 2.3 partner age must be an integer.")
+    if not isinstance(partner[2], str) or not partner[2]:
+        raise AssertionError(
+            "exercise 2.3 partner favorite_food must be a non-empty string."
         )
 
 
@@ -525,15 +555,15 @@ def check_2_5_fn():
 
     f = get_func("exercise_2_5")
     result = f()
-    
+
     if not isinstance(result, tuple) or len(result) != 4:
         raise TypeError(
             "exercise 2.5 must return a tuple of 4 elements: "
             "(create_table_sql, insert_sql, query_sql_text, query_results)"
         )
-    
+
     create_table_sql, insert_sql, query_sql_text, query_results = result
-    
+
     assert_return_not_edit_me(create_table_sql, "2.5")
     assert_return_not_edit_me(insert_sql, "2.5")
     assert_return_not_edit_me(query_sql_text, "2.5")
@@ -544,10 +574,10 @@ def check_2_5_fn():
         schema = _table_info("Friends")
     except Exception:
         raise AssertionError("Friends table was not created (or name is wrong).")
-    
+
     if not schema:
         raise AssertionError("Friends table was not created (or name is wrong).")
-    
+
     # Check columns exist (order may vary)
     col_names = {col[1] for col in schema}  # col[1] is the column name
     expected_cols = {"id", "first_student_id", "second_student_id"}
@@ -555,7 +585,7 @@ def check_2_5_fn():
         raise AssertionError(
             f"Friends table must have columns {expected_cols}, got {col_names}."
         )
-    
+
     # Verify foreign keys were created (check schema)
     # Note: This is a basic check; sqlite3 PRAGMA foreign_key_list would be more thorough
     col_types = {col[1]: col[2] for col in schema}  # name: type
@@ -563,48 +593,53 @@ def check_2_5_fn():
         raise AssertionError("first_student_id must be INTEGER type.")
     if col_types.get("second_student_id") != "INTEGER":
         raise AssertionError("second_student_id must be INTEGER type.")
-    
+
     # Verify insertions
-    friends_rows = _fetchall("SELECT first_student_id, second_student_id FROM Friends ORDER BY id;")
+    friends_rows = _fetchall(
+        "SELECT first_student_id, second_student_id FROM Friends ORDER BY id;"
+    )
     if len(friends_rows) != 3:
         raise AssertionError(
             f"exercise 2.5 must insert exactly 3 friend relationships, got {len(friends_rows)}."
         )
-    
+
     # Check that the expected relationships exist (in either direction)
     relationships = set()
     for first, second in friends_rows:
         relationships.add((min(first, second), max(first, second)))
-    
+
     # Expected: Elena(4)-Joey(3), You(1)-Partner(5), You(1)-Mattia(2)
     expected_relationships = {
         (3, 4),  # Elena and Joey
         (1, 5),  # You and Partner
         (1, 2),  # You and Mattia
     }
-    
+
     if relationships != expected_relationships:
         raise AssertionError(
             f"exercise 2.5 must insert these friend pairs: {expected_relationships}, got {relationships}."
         )
-    
+
     # Verify query results
     if not isinstance(query_results, list):
         raise TypeError("exercise 2.5 query_results must be a list of tuples.")
-    
+
     # Extract names from results (they come as single-element tuples)
     friend_names = {row[0] for row in query_results}
-    
+
     # Expected: Mattia (id=2) and partner name (id=5)
     # Partner name is the 5th student inserted
-    expected_friends = {"Mattia", "partners_name"}  # We'll need to get the actual partner name
-    
+    expected_friends = {
+        "Mattia",
+        "partners_name",
+    }  # We'll need to get the actual partner name
+
     # Get partner's actual name from Students table
     partner_row = _fetchall("SELECT name FROM Students WHERE id = 5;")
     if partner_row:
         partner_name = partner_row[0][0]
         expected_friends = {"Mattia", partner_name}
-    
+
     if friend_names != expected_friends:
         raise AssertionError(
             f"exercise 2.5 query must return your friends (Mattia and your partner), got {friend_names}."
@@ -625,47 +660,48 @@ check_2_5 = Check("2.5", check_2_5_fn)
 def check_3_1_fn():
     f = get_func("exercise_3_1")
     result = f()
-    
+
     if not isinstance(result, tuple) or len(result) != 3:
         raise TypeError(
             "exercise 3.1 must return a tuple of 3 elements: "
             "(client, database, collection)"
         )
-    
+
     client, database, collection = result
-    
+
     assert_return_not_edit_me(client, "3.1")
     assert_return_not_edit_me(database, "3.1")
     assert_return_not_edit_me(collection, "3.1")
-    
+
     # Check that client is a mongomock client
     import mongomock
+
     if not isinstance(client, mongomock.MongoClient):
         raise TypeError(
             "exercise 3.1 client must be a mongomock.MongoClient instance. "
             "Use mongomock.MongoClient() to create it."
         )
-    
+
     # Check that database is a Database instance
     if not isinstance(database, mongomock.Database):
         raise TypeError(
             "exercise 3.1 database must be a mongomock.Database instance. "
             "Access it using client.my_database or client['my_database']."
         )
-    
+
     # Check that collection is a Collection instance
     if not isinstance(collection, mongomock.Collection):
         raise TypeError(
             "exercise 3.1 collection must be a mongomock.Collection instance. "
             "Access it using database.students or database['students']."
         )
-    
+
     # Check correct names
     if database.name != "my_database":
         raise AssertionError(
             f"exercise 3.1 database must be named 'my_database', got '{database.name}'."
         )
-    
+
     if collection.name != "students":
         raise AssertionError(
             f"exercise 3.1 collection must be named 'students', got '{collection.name}'."
@@ -705,7 +741,9 @@ def check_4_1_fn():
         raise AssertionError("exercise 4.1 'age' must be an integer.")
 
     if not isinstance(result["favorite_color"], str) or not result["favorite_color"]:
-        raise AssertionError("exercise 4.1 'favorite_color' must be a non-empty string.")
+        raise AssertionError(
+            "exercise 4.1 'favorite_color' must be a non-empty string."
+        )
 
 
 check_4_1 = Check("4.1", check_4_1_fn)
@@ -733,9 +771,7 @@ def check_4_2_fn():
             raise TypeError(f"exercise 4.2 document {i} must be a dictionary.")
         if not required_keys.issubset(doc.keys()):
             missing = required_keys - set(doc.keys())
-            raise AssertionError(
-                f"exercise 4.2 document {i} missing keys: {missing}."
-            )
+            raise AssertionError(f"exercise 4.2 document {i} missing keys: {missing}.")
 
 
 check_4_2 = Check("4.2", check_4_2_fn)
@@ -754,9 +790,7 @@ def check_4_3_fn():
     assert_return_not_edit_me(result, "4.3")
 
     if not isinstance(result, tuple) or len(result) != 2:
-        raise TypeError(
-            "exercise 4.3 must return a tuple (single_result, all_adults)."
-        )
+        raise TypeError("exercise 4.3 must return a tuple (single_result, all_adults).")
 
     single_result, all_adults = result
     assert_return_not_edit_me(single_result, "4.3")
