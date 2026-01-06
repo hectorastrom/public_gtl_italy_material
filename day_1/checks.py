@@ -476,7 +476,7 @@ def check_2_3_fn():
         )
 
     # For downstream determinism (2.4), we require these exact additional inserts.
-    inserted = set(rows[1:])  # skip the first row from 2.2
+    inserted = set(rows[1:4])  # skip the first row from 2.2, and last row of partner
     expected = {
         ("Mattia", 28, "pizza"),
         ("Joey", 19, "burgers"),
