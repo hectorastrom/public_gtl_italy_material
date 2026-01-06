@@ -249,15 +249,20 @@ def check_1_3_fn():
     if not isinstance(csv_out, str):
         raise TypeError("exercise 1.3 must return a string.")
 
-    lines = csv_out.strip().split("\n")
+    # Handle both \n and \r\n line endings
+    lines = csv_out.strip().replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    # Also strip each line to handle any trailing whitespace
+    lines = [line.strip() for line in lines if line.strip()]
 
     if lines[0] != "name,age,nationality":
-        raise AssertionError("exercise 1.3 header must be 'name,age,nationality'.")
+        raise AssertionError(
+            f"exercise 1.3 header must be 'name,age,nationality'. Got: {repr(lines[0])}"
+        )
 
     if len(lines) != 4:
         raise AssertionError(f"exercise 1.3 expected 4 lines total, got {len(lines)}.")
 
-    names = {line.split(",")[0] for line in lines[1:]}
+    names = {line.split(",")[0].strip() for line in lines[1:]}
     if names != {"Hector", "Mattia", "Joey"}:
         raise AssertionError("exercise 1.3 row data is incorrect.")
 
