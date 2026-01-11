@@ -41,12 +41,22 @@ class Check:
 
 def run_check(check_id: str, *args, silent=False, **kwargs):
     assert check_id in check_registry, f"ERROR: Missing check for exercise {check_id}"
-    check_registry[check_id](*args, **kwargs)
-    # Invariant: checks must throw a DESCRIPTIVE error if they fail
-    # otherwise, they've passed!
+    
     if not silent:
-        print(f"Passed Exercise {check_id}!")
-    return True
+        print(f"Running check for exercise {check_id}...\n")
+ 
+    try:
+        check_registry[check_id](*args, **kwargs)
+        # Invariant: checks must throw a DESCRIPTIVE error if they fail
+        # otherwise, they've passed!
+        if not silent:
+            print(f"Passed Exercise {check_id}!")
+        return True
+    except Exception as e:
+        if not silent:
+            print(f"Exercise {check_id} failed due to: {type(e).__name__}")
+            print(f"'{e}'")
+        raise
 
 
 def is_defined(variable_name: str):
@@ -361,19 +371,40 @@ def _check_3_1():
     sql_query, nosql_filter, nosql_projection, results = func()
 
     _assert_no_placeholder(sql_query, "3.1")
-    assert "SELECT make" in sql_query and "price <=" in sql_query.replace(" ", ""), (
-        "SQL query should mirror the provided SELECT with price <= 30000."
+    query_lower = sql_query.lower().replace(" ", "")
+    assert "selectmake,model,price" in query_lower, (
+        "SQL query should select make, model, and price."
     )
+    assert "status='available'" in query_lower, "SQL query should filter status = 'available'."
+    assert "price<=30000" in query_lower, "SQL query should limit price to <= 30000."
 
+    _assert_no_placeholder(nosql_filter, "3.1")
+    _assert_no_placeholder(nosql_projection, "3.1")
+    assert isinstance(nosql_filter, dict), "nosql_filter must be a dictionary."
     assert nosql_filter.get("status") == "available", "nosql_filter must require status='available'."
     price_filter = nosql_filter.get("price", {})
+    assert isinstance(price_filter, dict), "nosql_filter['price'] should be a dict with a comparison operator."
     comp_value = price_filter.get("$lte", price_filter.get("$lt"))
     assert isinstance(comp_value, int) and comp_value <= 30000, "nosql_filter must cap price at 30000."
 
-    assert nosql_projection == {"_id": 0, "make": 1, "model": 1, "price": 1}, (
+    expected_projection = {"_id": 0, "make": 1, "model": 1, "price": 1}
+    assert nosql_projection == expected_projection, (
         "nosql_projection should include make, model, price and hide _id."
     )
+
     assert isinstance(results, list), "results should be a list of documents."
+    for doc in results:
+        assert isinstance(doc, dict), "Each result should be a dictionary."
+        assert "_id" not in doc, "Projection should remove _id from results."
+        assert "price" in doc, "Each result should include price."
+        if isinstance(doc["price"], (int, float)):
+            assert doc["price"] <= 30000, "Returned prices must be <= 30000."
+
+    numeric_prices = [doc["price"] for doc in results if isinstance(doc.get("price"), (int, float))]
+    if len(numeric_prices) >= 2:
+        assert numeric_prices == sorted(numeric_prices, reverse=True), (
+            "Results should be sorted by price in descending order."
+        )
 
 
 check_3_1 = Check("3.1", _check_3_1)
@@ -382,13 +413,26 @@ check_3_1 = Check("3.1", _check_3_1)
 def _check_3_2():
     func = get_func("exercise_3_2")
     sql_command, inserted_doc = func()
+
     _assert_no_placeholder(sql_command, "3.2")
+    _assert_no_placeholder(inserted_doc, "3.2")
+    sql_lower = sql_command.lower().replace(" ", "")
+    assert "createtablecars" in sql_lower, "SQL should create the Cars table."
+    assert "priceinteger" in sql_lower and "status" in sql_lower, (
+        "SQL should define price as INTEGER and include status."
+    )
 
     required_fields = {"make", "model", "year", "price", "status"}
+    assert isinstance(inserted_doc, dict), "Inserted document should be a dictionary."
     assert required_fields.issubset(inserted_doc.keys()), (
         "example_car should include make, model, year, price, and status."
     )
     assert "_id" not in inserted_doc, "Inserted document should be returned without _id."
+    assert isinstance(inserted_doc.get("year"), int), "year should be an integer."
+    assert isinstance(inserted_doc.get("price"), int), "price should be an integer."
+    assert isinstance(inserted_doc.get("make"), str), "make should be text."
+    assert isinstance(inserted_doc.get("model"), str), "model should be text."
+    assert isinstance(inserted_doc.get("status"), str), "status should be text."
 
 
 check_3_2 = Check("3.2", _check_3_2)
@@ -397,7 +441,13 @@ check_3_2 = Check("3.2", _check_3_2)
 def _check_3_3():
     func = get_func("exercise_3_3")
     sql_insert, nosql_doc, inserted_without_id = func()
+
     _assert_no_placeholder(sql_insert, "3.3")
+    _assert_no_placeholder(nosql_doc, "3.3")
+    sql_lower = sql_insert.lower()
+    assert "insert into cars" in sql_lower and "lancia" in sql_lower and "ypsilon" in sql_lower, (
+        "SQL insert should target Cars and insert the provided Lancia Ypsilon values."
+    )
 
     expected = {
         "make": "Lancia",
@@ -467,3 +517,35 @@ def _check_2_5():
 
 
 check_2_5 = Check("2.5", _check_2_5)
+
+
+def _check_2_6():
+    func = get_func("exercise_b_2")
+    car_doc, customer_doc, joined_view = func()
+
+    assert isinstance(car_doc, dict), "car_doc should be a dictionary."
+    assert "_id" in car_doc, "car_doc must include the inserted _id."
+    _assert_no_placeholder(str(car_doc), "2.6")
+
+    assert isinstance(customer_doc, dict), "customer_doc should be a dictionary."
+    _assert_no_placeholder(str(customer_doc), "2.6")
+    assert "car_id" in customer_doc, "customer_doc must reference car_id."
+    assert customer_doc["car_id"] == car_doc["_id"], "customer_doc.car_id must match car_doc._id."
+
+    assert isinstance(joined_view, dict), "joined_view should be a dictionary."
+    _assert_no_placeholder(str(joined_view), "2.6")
+    linked_candidates = [
+        joined_view.get("car_id"),
+        joined_view.get("car", {}).get("_id") if isinstance(joined_view.get("car"), dict) else None,
+        joined_view.get("car_doc", {}).get("_id") if isinstance(joined_view.get("car_doc"), dict) else None,
+    ]
+    assert any(link_id == car_doc["_id"] for link_id in linked_candidates), (
+        "joined_view should include the linked car id."
+    )
+    if "customer" in joined_view and isinstance(joined_view["customer"], dict):
+        assert joined_view["customer"].get("car_id") == customer_doc["car_id"], (
+            "joined_view.customer should reference the same car_id."
+        )
+
+
+check_2_6 = Check("2.6", _check_2_6)
