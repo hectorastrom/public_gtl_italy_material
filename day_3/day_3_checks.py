@@ -63,6 +63,9 @@ def get_file_hash() -> str:
 
 
 def run_all_checks(skip_checks: List[str] | None = None) -> Tuple[Dict[str, Tuple[bool, str]], float]:
+    import sys
+    import io
+
     skip_checks = skip_checks or []
     check_stats: Dict[str, Tuple[bool, str]] = {}
     total_correct = 0
@@ -82,6 +85,10 @@ def run_all_checks(skip_checks: List[str] | None = None) -> Tuple[Dict[str, Tupl
         if check_id in skip_checks:
             continue
 
+        # Suppress print output from exercise functions
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+
         try:
             check(update_time=False)
             status_icon = "OK"
@@ -90,6 +97,9 @@ def run_all_checks(skip_checks: List[str] | None = None) -> Tuple[Dict[str, Tupl
         except Exception:
             status_icon = "WRONG"
             passed = False
+        finally:
+            # Restore stdout
+            sys.stdout = old_stdout
 
         last_ran_str = check.last_ran.strftime("%m-%d %H:%M") if check.last_ran else "NEVER"
         check_stats[check_id] = (passed, last_ran_str)
@@ -305,8 +315,16 @@ def _check_2_5():
 
     assert isinstance(oid_str, str) and len(oid_str) >= 10, "oid_str must be a string ObjectId."
     oid = ObjectId(oid_str)  # will raise if invalid
-    dt = datetime.fromisoformat(created_at_iso)
-    assert isinstance(dt, datetime), "created_at_iso must be parseable by datetime.fromisoformat."
+
+    # Accept either a datetime object or an ISO format string
+    if isinstance(created_at_iso, datetime):
+        dt = created_at_iso
+    elif isinstance(created_at_iso, str):
+        dt = datetime.fromisoformat(created_at_iso)
+    else:
+        raise AssertionError("created_at_iso must be a datetime or ISO format string.")
+
+    assert isinstance(dt, datetime), "created_at_iso must be parseable as a datetime."
     assert dt.year >= 2024, "ObjectId timestamp should be recent (this year or last year)."
     assert oid.generation_time.year >= 2024, "ObjectId generation_time should be recent."
 
@@ -465,58 +483,5 @@ def _check_3_4():
 check_3_4 = Check("3.4", _check_3_4)
 
 
-def _check_3_5():
-    func = get_func("exercise_3_5")
-    playlist_filter, update_operation, playlist_doc = func()
-
-    _assert_no_placeholder(playlist_filter, "3.5")
-    _assert_no_placeholder(update_operation, "3.5")
-    _assert_no_placeholder(playlist_doc, "3.5")
-
-    assert isinstance(playlist_filter, dict) and playlist_filter.get("name") == "day3_demo", (
-        "playlist_filter must target name='day3_demo'."
-    )
-
-    assert isinstance(update_operation, dict) and "$push" in update_operation, "Must use $push in the update operation."
-    push = update_operation["$push"]
-    assert isinstance(push, dict) and "song_ids" in push, "$push must push into song_ids."
-
-    assert isinstance(playlist_doc, dict), "playlist_doc must be a dict."
-    assert playlist_doc.get("name") == "day3_demo", "Playlist name must be day3_demo."
-    assert "song_ids" in playlist_doc and isinstance(playlist_doc["song_ids"], list), "song_ids must be a list."
-    assert len(playlist_doc["song_ids"]) >= 1, "song_ids must contain at least one ObjectId."
-    assert all(isinstance(x, ObjectId) for x in playlist_doc["song_ids"]), "song_ids items must be ObjectId."
-    assert "_id" not in playlist_doc, "Projection should exclude _id."
-
-    # Owners can be named slightly differently, but we expect an owners list.
-    assert "owners" in playlist_doc and isinstance(playlist_doc["owners"], list) and len(playlist_doc["owners"]) >= 1, (
-        "Playlist must include an owners list set on insert."
-    )
-
-
-check_3_5 = Check("3.5", _check_3_5)
-
-
-def _check_3_6():
-    func = get_func("exercise_3_6")
-    joined_view = func()
-    _assert_no_placeholder(joined_view, "3.6")
-
-    assert isinstance(joined_view, dict), "joined_view must be a dict."
-    for key in ["playlist_name", "num_songs", "songs"]:
-        assert key in joined_view, f"joined_view must include '{key}'."
-
-    assert joined_view["playlist_name"] == "day3_demo", "playlist_name must be day3_demo."
-    assert isinstance(joined_view["songs"], list), "songs must be a list."
-    assert isinstance(joined_view["num_songs"], int), "num_songs must be an int."
-    assert joined_view["num_songs"] == len(joined_view["songs"]), "num_songs must match len(songs)."
-
-    for song in joined_view["songs"]:
-        assert isinstance(song, dict), "Each song must be a dict."
-        for k in ["track_name", "artists", "popularity"]:
-            assert k in song, f"Each song must include '{k}'."
-
-    assert joined_view["num_songs"] >= 1, "Expected at least 1 joined song."
-
-
-check_3_6 = Check("3.6", _check_3_6)
+# Note: Exercise 3.5 has no check (it's an exploration exercise)
+# Exercises 3.5 and 3.6 from earlier versions were removed
