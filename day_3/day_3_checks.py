@@ -172,14 +172,11 @@ check_0_1 = Check("0.1", lambda: None)
 
 def _check_1_1():
     func = get_func("exercise_1_1")
-    atlas_uri, db_name = func()
+    atlas_uri = func()
     _assert_no_placeholder(atlas_uri, "1.1")
-    _assert_no_placeholder(db_name, "1.1")
     assert isinstance(atlas_uri, str) and atlas_uri.startswith("mongodb+srv://"), (
         "atlas_uri must start with 'mongodb+srv://'."
     )
-    assert isinstance(db_name, str) and len(db_name.strip()) >= 2, "db_name must be a non-empty string."
-
 
 check_1_1 = Check("1.1", _check_1_1)
 
@@ -484,4 +481,79 @@ check_3_4 = Check("3.4", _check_3_4)
 
 
 # Note: Exercise 3.5 has no check (it's an exploration exercise)
-# Exercises 3.5 and 3.6 from earlier versions were removed
+
+
+###############################
+# bonus exercises
+###############################
+def _check_b_1():
+    func = get_func("exercise_b_1")
+    playlist_filter, update_operation, playlist_doc = func()
+
+    _assert_no_placeholder(playlist_filter, "b.1")
+    _assert_no_placeholder(update_operation, "b.1")
+    _assert_no_placeholder(playlist_doc, "b.1")
+
+    assert (
+        isinstance(playlist_filter, dict) and playlist_filter.get("name") == "day3_demo"
+    ), "playlist_filter must target name='day3_demo'."
+
+    assert (
+        isinstance(update_operation, dict) and "$push" in update_operation
+    ), "Must use $push in the update operation."
+    push = update_operation["$push"]
+    assert (
+        isinstance(push, dict) and "song_ids" in push
+    ), "$push must push into song_ids."
+
+    assert isinstance(playlist_doc, dict), "playlist_doc must be a dict."
+    assert playlist_doc.get("name") == "day3_demo", "Playlist name must be day3_demo."
+    assert "song_ids" in playlist_doc and isinstance(
+        playlist_doc["song_ids"], list
+    ), "song_ids must be a list."
+    assert (
+        len(playlist_doc["song_ids"]) >= 1
+    ), "song_ids must contain at least one ObjectId."
+    assert all(
+        isinstance(x, ObjectId) for x in playlist_doc["song_ids"]
+    ), "song_ids items must be ObjectId."
+    assert "_id" not in playlist_doc, "Projection should exclude _id."
+
+    # Owners can be named slightly differently, but we expect an owners list.
+    assert (
+        "owners" in playlist_doc
+        and isinstance(playlist_doc["owners"], list)
+        and len(playlist_doc["owners"]) >= 1
+    ), "Playlist must include an owners list set on insert."
+
+
+check_b_1 = Check("b.1", _check_b_1)
+
+
+def _check_b_2():
+    func = get_func("exercise_b_2")
+    joined_view = func()
+    _assert_no_placeholder(joined_view, "b.2")
+
+    assert isinstance(joined_view, dict), "joined_view must be a dict."
+    for key in ["playlist_name", "num_songs", "songs"]:
+        assert key in joined_view, f"joined_view must include '{key}'."
+
+    assert (
+        joined_view["playlist_name"] == "day3_demo"
+    ), "playlist_name must be day3_demo."
+    assert isinstance(joined_view["songs"], list), "songs must be a list."
+    assert isinstance(joined_view["num_songs"], int), "num_songs must be an int."
+    assert joined_view["num_songs"] == len(
+        joined_view["songs"]
+    ), "num_songs must match len(songs)."
+
+    for song in joined_view["songs"]:
+        assert isinstance(song, dict), "Each song must be a dict."
+        for k in ["track_name", "artists", "popularity"]:
+            assert k in song, f"Each song must include '{k}'."
+
+    assert joined_view["num_songs"] >= 1, "Expected at least 1 joined song."
+
+
+check_b_2 = Check("b.2", _check_b_2)
