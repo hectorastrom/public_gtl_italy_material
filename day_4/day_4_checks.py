@@ -136,7 +136,7 @@ def run_all_checks(skip_checks: list[str] = None) -> tuple[dict, float]:
             passed = True
             total_correct += 1
         except Exception:
-            status_icon = "WRONG"
+            status_icon = "INCOMPLETE"
             passed = False
         finally:
             # Restore stdout
@@ -148,7 +148,7 @@ def run_all_checks(skip_checks: list[str] = None) -> tuple[dict, float]:
         check_stats[check_id] = (passed, last_ran_str)
 
         # Print table row
-        print(f"{check_id:<12} | {status_icon:<10} | {last_ran_str}")
+        print(f"{check_id:<12} | {status_icon:<15} | {last_ran_str}")
 
     # Final Score logic
     num_checks = len(check_registry) - len(skip_checks)
@@ -343,6 +343,29 @@ def _check_2_3():
 
 
 check_2_3 = Check("2.3", _check_2_3)
+
+
+def _check_2_4():
+    """Check unique field validator implementation."""
+    func = get_func("exercise_2_4")
+    result = func()
+    
+    assert isinstance(result, tuple) and len(result) == 2, (
+        "exercise_2_4 must return a tuple of two booleans: "
+        "(validate_name_unique('Elena'), validate_name_unique('Hector'))"
+    )
+    
+    elena_unique, hector_unique = result
+    
+    assert elena_unique == False, (
+        "validate_name_unique('Elena') should return False - Elena exists in the collection"
+    )
+    assert hector_unique == True, (
+        "validate_name_unique('Hector') should return True - Hector does not exist in the collection"
+    )
+
+
+check_2_4 = Check("2.4", _check_2_4)
 
 
 ###############################

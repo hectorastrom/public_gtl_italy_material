@@ -10,9 +10,10 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+from pymongo.collection import Collection
 from bson import ObjectId
 
 
@@ -152,7 +153,12 @@ class CannizzaroStudent(BaseModel):
     Complete schema for a student in the ITIS Cannizzaro database.
     
     This model validates all student data before insertion into MongoDB.
+    Call `CannizzaroStudent.set_collection(collection)` before creating
+    instances to enable alias uniqueness validation.
     """
+    # Class variable to store collection reference for uniqueness validation
+    _collection: Optional[Collection] = None
+    
     demographics: Demographics
     academics: Academics
     behavioral: Behavioral
@@ -162,3 +168,41 @@ class CannizzaroStudent(BaseModel):
     class Config:
         # Allow extra fields to be ignored (like _id from MongoDB)
         extra = "ignore"
+
+    @classmethod
+    def set_collection(cls, collection: Collection) -> None:
+        """
+        Set the MongoDB collection to use for alias uniqueness validation.
+        
+        Call this before creating CannizzaroStudent instances:
+            CannizzaroStudent.set_collection(my_collection)
+        """
+        cls._collection = collection
+
+    @classmethod
+    def clear_collection(cls) -> None:
+        """Clear the collection reference (useful for testing)."""
+        cls._collection = None
+
+    @model_validator(mode="after")
+    def validate_alias_unique(self) -> "CannizzaroStudent":
+        """
+        Validate that the alias is unique in the collection.
+        
+        This validator only runs if a collection has been set via set_collection().
+        If no collection is set, uniqueness validation is skipped.
+        """
+        if self._collection is None:
+            # No collection configured, skip uniqueness check
+            return self
+        
+        alias = self.demographics.alias
+        existing = self._collection.find_one({"demographics.alias": alias})
+        
+        if existing is not None:
+            raise ValueError(
+                f"Alias '{alias}' already exists in the database {existing}. "
+                f"Please choose a different alias."
+            )
+        
+        return self
