@@ -337,14 +337,10 @@ def _check_2_1():
     docs = _get_two_student_docs()
     alias = docs[0]["demographics"]["alias"]
 
-    result = find_by_alias(alias)
-    assert isinstance(result, dict), "find_by_alias must return a dict"
-    assert alias in result, f"find_by_alias should return a dict containing key '{alias}'"
-
     CannizzaroStudent = get_var("CannizzaroStudent")
-    student_model = result[alias]
+    student_model = find_by_alias(alias)
     assert isinstance(student_model, CannizzaroStudent), (
-        "find_by_alias values must be CannizzaroStudent objects"
+        "find_by_alias must return a CannizzaroStudent object"
     )
     assert student_model.demographics.alias == alias, (
         f"Returned student alias should be '{alias}', got '{student_model.demographics.alias}'"

@@ -17,20 +17,15 @@ from bson import ObjectId
 # -----------------------------------------------
 # MongoDB Connection Helpers
 # -----------------------------------------------
-URI = "mongodb+srv://student:secret1239@itis-cannizzaro.4arjswx.mongodb.net/?appName=ITIS-Cannizzaro"
-def get_shared_database() -> Database:
+def get_shared_database(uri: str) -> Database:
     """
     Connect to the shared class MongoDB database.
     """
-    client = MongoClient(URI, server_api=ServerApi("1"))
+    client = MongoClient(uri, server_api=ServerApi("1"))
     database = client.get_database('itis-cannizzaro')
     return database
 
-DATABASE = get_shared_database()
-students_collection = DATABASE.students
-friendships_collection = DATABASE.friendships
-
-def insert_friendship_if_not_exists(friendship: Friendship) -> None:
+def insert_friendship_if_not_exists(friendship: Friendship, students_collection: Collection, friendships_collection: Collection) -> None:
     """
     Insert a friendship if it doesn't exist.
     """
@@ -166,7 +161,7 @@ class CannizzaroStudent(BaseModel):
     """
     # Class variable to store collection reference for uniqueness validation
     _collection: Optional[Collection] = None
-
+    _id: str | None = None
     demographics: Demographics
     academics: Academics
     behavioral: Behavioral
